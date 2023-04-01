@@ -10,6 +10,8 @@ ws is a simple command line websocket client designed for exploring and debuggin
 go install -u github.com/slytomcat/ws
 ```
 
+Or download compiled binary (ELF 64-bit LSB executable, x86-64) from assests of [releases](https://github.com/slytomcat/ws/releases)
+
 ## Usage
 
 Simply run ws with the destination URL. For security some sites check the origin header. ws will automatically send the destination URL as the origin. If this doesn't work you can specify it directly with the `--origin` parameter.
