@@ -7,7 +7,7 @@ ws is a simple command line websocket client designed for exploring and debuggin
 ## Installation
 
 ```
-go get -u github.com/hashrocket/ws
+go install -u github.com/slytomcat/ws
 ```
 
 ## Usage
@@ -24,3 +24,21 @@ $ ws ws://localhost:3000/ws
 > ^D
 EOF
 ```
+
+## Help message
+
+```websocket tool v. 0.2.2
+
+Usage:
+  ws URL [flags]
+
+Flags:
+  -b, --bit2tesxt            print binary message as text
+  -h, --help                 help for ws
+  -k, --insecure             skip ssl certificate check
+  -o, --origin string        websocket origin
+  -s, --subprotocal string   sec-websocket-protocal field
+  -t, --timestamp            print timestamps for sent and incoming messages
+  -v, --version              print version
+  
+  ```

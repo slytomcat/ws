@@ -12,25 +12,32 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const Version = "0.2.1"
+// Version is app version
+const Version = "0.2.2"
 
-var options struct {
+type optionsStruct struct {
 	origin       string
 	printVersion bool
 	insecure     bool
 	subProtocals string
+	timestamp    bool
+	binAsText    bool
 }
+
+var options optionsStruct
 
 func main() {
 	rootCmd := &cobra.Command{
 		Use:   "ws URL",
-		Short: "websocket tool",
+		Short: fmt.Sprintf("websocket tool v. %s", Version),
 		Run:   root,
 	}
 	rootCmd.Flags().StringVarP(&options.origin, "origin", "o", "", "websocket origin")
 	rootCmd.Flags().BoolVarP(&options.printVersion, "version", "v", false, "print version")
 	rootCmd.Flags().BoolVarP(&options.insecure, "insecure", "k", false, "skip ssl certificate check")
 	rootCmd.Flags().StringVarP(&options.subProtocals, "subprotocal", "s", "", "sec-websocket-protocal field")
+	rootCmd.Flags().BoolVarP(&options.timestamp, "timestamp", "t", false, "print timestamps for sent and incoming messages")
+	rootCmd.Flags().BoolVarP(&options.binAsText, "bit2tesxt", "b", false, "print binary message as text")
 
 	rootCmd.Execute()
 }
@@ -52,17 +59,14 @@ func root(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	var origin string
-	if options.origin != "" {
-		origin = options.origin
-	} else {
+	if options.origin == "" {
 		originURL := *dest
 		if dest.Scheme == "wss" {
 			originURL.Scheme = "https"
 		} else {
 			originURL.Scheme = "http"
 		}
-		origin = originURL.String()
+		options.origin = originURL.String()
 	}
 
 	var historyFile string
@@ -71,10 +75,10 @@ func root(cmd *cobra.Command, args []string) {
 		historyFile = filepath.Join(user.HomeDir, ".ws_history")
 	}
 
-	err = connect(dest.String(), origin, options.subProtocals, &readline.Config{
+	err = connect(dest.String(), &readline.Config{
 		Prompt:      "> ",
 		HistoryFile: historyFile,
-	}, options.insecure)
+	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		if err != io.EOF && err != readline.ErrInterrupt {

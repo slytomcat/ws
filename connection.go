@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"time"
 
 	"github.com/chzyer/readline"
 	"github.com/fatih/color"
@@ -18,16 +19,20 @@ type session struct {
 	errChan chan error
 }
 
-func connect(url, origin string, subProtocals string, rlConf *readline.Config, allowInsecure bool) error {
+var rxSprintf = color.New(color.FgGreen).SprintfFunc()
+
+const tcFormat = "20060102T150405.999"
+
+func connect(url string, rlConf *readline.Config) error {
 	headers := make(http.Header)
-	headers.Add("Origin", origin)
+	headers.Add("Origin", options.origin)
 
 	dialer := websocket.Dialer{
 		Proxy: http.ProxyFromEnvironment,
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: allowInsecure,
+			InsecureSkipVerify: options.insecure,
 		},
-		Subprotocols: []string{subProtocals},
+		Subprotocols: []string{options.subProtocals},
 	}
 	ws, _, err := dialer.Dial(url, headers)
 	if err != nil {
@@ -65,6 +70,11 @@ func (s *session) readConsole() {
 			s.errChan <- err
 			return
 		}
+		var prefix string
+		if options.timestamp {
+			prefix = time.Now().UTC().Format(tcFormat)
+		}
+		fmt.Fprint(s.rl.Stdout(), rxSprintf("%s > %s\n", prefix, line))
 	}
 }
 
@@ -74,8 +84,6 @@ func bytesToFormattedHex(bytes []byte) string {
 }
 
 func (s *session) readWebsocket() {
-	rxSprintf := color.New(color.FgGreen).SprintfFunc()
-
 	for {
 		msgType, buf, err := s.ws.ReadMessage()
 		if err != nil {
@@ -88,12 +96,19 @@ func (s *session) readWebsocket() {
 		case websocket.TextMessage:
 			text = string(buf)
 		case websocket.BinaryMessage:
-			text = bytesToFormattedHex(buf)
+			if options.binAsText {
+				text = string(buf)
+			} else {
+				text = bytesToFormattedHex(buf)
+			}
 		default:
 			s.errChan <- fmt.Errorf("unknown websocket frame type: %d", msgType)
 			return
 		}
-
-		fmt.Fprint(s.rl.Stdout(), rxSprintf("< %s\n", text))
+		var prefix string
+		if options.timestamp {
+			prefix = time.Now().UTC().Format(tcFormat)
+		}
+		fmt.Fprint(s.rl.Stdout(), rxSprintf("%s < %s\n", prefix, text))
 	}
 }
