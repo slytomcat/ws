@@ -15,7 +15,7 @@ import (
 // Version is app version
 const Version = "0.2.2"
 
-type optionsStruct struct {
+var options struct {
 	origin       string
 	printVersion bool
 	insecure     bool
@@ -24,12 +24,10 @@ type optionsStruct struct {
 	binAsText    bool
 }
 
-var options optionsStruct
-
 func main() {
 	rootCmd := &cobra.Command{
 		Use:   "ws URL",
-		Short: fmt.Sprintf("websocket tool v. %s", Version),
+		Short: fmt.Sprintf("websocket client v.%s", Version),
 		Run:   root,
 	}
 	rootCmd.Flags().StringVarP(&options.origin, "origin", "o", "", "websocket origin")
@@ -44,7 +42,7 @@ func main() {
 
 func root(cmd *cobra.Command, args []string) {
 	if options.printVersion {
-		fmt.Printf("ws v%s\n", Version)
+		fmt.Printf("ws v.%s\n", Version)
 		os.Exit(0)
 	}
 

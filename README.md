@@ -10,11 +10,15 @@ ws is a simple command line websocket client designed for exploring and debuggin
 go install github.com/slytomcat/ws@latest
 ```
 
-Or download compiled binary (ELF 64-bit LSB executable, x86-64) from assests of [releases](https://github.com/slytomcat/ws/releases)
+Or download compiled binary (ELF 64-bit LSB executable, x86-64) from assets of [releases](https://github.com/slytomcat/ws/releases)
 
 ## Usage
 
-Simply run ws with the destination URL. For security some sites check the origin header. ws will automatically send the destination URL as the origin. If this doesn't work you can specify it directly with the `--origin` parameter.
+```
+ws URL [flags]
+```
+
+Simply run ws with the destination URL. For security some sites check the origin header. ws will automatically send the destination URL as the origin. If this doesn't work you can specify it directly with the `--origin` option.
 
 ```
 $ ws ws://localhost:3000/ws
@@ -27,13 +31,9 @@ $ ws ws://localhost:3000/ws
 EOF
 ```
 
-## Help message
+## Other possible options
 
-```websocket tool v. 0.2.2
-
-Usage:
-  ws URL [flags]
-
+```
 Flags:
   -b, --bin2text             print binary message as text
   -h, --help                 help for ws
@@ -43,4 +43,4 @@ Flags:
   -t, --timestamp            print timestamps for sent and incoming messages
   -v, --version              print version
   
-  ```
+```

@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
-	"regexp"
+	"strings"
 	"time"
 
 	"github.com/chzyer/readline"
@@ -13,15 +13,30 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type session struct {
+// Session is the WS session
+type Session struct {
 	ws      *websocket.Conn
 	rl      *readline.Instance
 	errChan chan error
 }
 
-var rxSprintf = color.New(color.FgGreen).SprintfFunc()
+var (
+	rxSprintf = color.New(color.FgGreen).SprintfFunc()
+	txSprintf = color.New(color.FgBlue).SprintfFunc()
+)
 
-const tcFormat = "20060102T150405.999"
+const tsFormat = "20060102T150405.999"
+
+func getPrefix() string {
+	if options.timestamp {
+		prefix := time.Now().UTC().Format(tsFormat)
+		if len(prefix) < 19 {
+			prefix += strings.Repeat("0", 19-len(prefix))
+		}
+		return prefix + " "
+	}
+	return ""
+}
 
 func connect(url string, rlConf *readline.Config) error {
 	headers := make(http.Header)
@@ -38,6 +53,7 @@ func connect(url string, rlConf *readline.Config) error {
 	if err != nil {
 		return err
 	}
+	defer ws.Close()
 
 	rl, err := readline.NewEx(rlConf)
 	if err != nil {
@@ -45,19 +61,19 @@ func connect(url string, rlConf *readline.Config) error {
 	}
 	defer rl.Close()
 
-	sess := &session{
+	session := &Session{
 		ws:      ws,
 		rl:      rl,
 		errChan: make(chan error),
 	}
 
-	go sess.readConsole()
-	go sess.readWebsocket()
+	go session.readConsole()
+	go session.readWebsocket()
 
-	return <-sess.errChan
+	return <-session.errChan
 }
 
-func (s *session) readConsole() {
+func (s *Session) readConsole() {
 	for {
 		line, err := s.rl.Readline()
 		if err != nil {
@@ -70,20 +86,13 @@ func (s *session) readConsole() {
 			s.errChan <- err
 			return
 		}
-		var prefix string
-		if options.timestamp {
-			prefix = time.Now().UTC().Format(tcFormat)
+		if options.timestamp { // repeat sent massage only if timestamp is required
+			fmt.Fprint(s.rl.Stdout(), txSprintf("%s> %s\n", getPrefix(), line))
 		}
-		fmt.Fprint(s.rl.Stdout(), rxSprintf("%s > %s\n", prefix, line))
 	}
 }
 
-func bytesToFormattedHex(bytes []byte) string {
-	text := hex.EncodeToString(bytes)
-	return regexp.MustCompile("(..)").ReplaceAllString(text, "$1 ")
-}
-
-func (s *session) readWebsocket() {
+func (s *Session) readWebsocket() {
 	for {
 		msgType, buf, err := s.ws.ReadMessage()
 		if err != nil {
@@ -99,16 +108,12 @@ func (s *session) readWebsocket() {
 			if options.binAsText {
 				text = string(buf)
 			} else {
-				text = bytesToFormattedHex(buf)
+				text = "\n" + hex.Dump(buf)
 			}
 		default:
 			s.errChan <- fmt.Errorf("unknown websocket frame type: %d", msgType)
 			return
 		}
-		var prefix string
-		if options.timestamp {
-			prefix = time.Now().UTC().Format(tcFormat)
-		}
-		fmt.Fprint(s.rl.Stdout(), rxSprintf("%s < %s\n", prefix, text))
+		fmt.Fprint(s.rl.Stdout(), rxSprintf("%s< %s\n", getPrefix(), text))
 	}
 }
