@@ -1,4 +1,4 @@
-module github.com/hashrocket/ws
+module github.com/slytomcat/ws
 
 go 1.19
 

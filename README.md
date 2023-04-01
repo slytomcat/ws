@@ -7,7 +7,7 @@ ws is a simple command line websocket client designed for exploring and debuggin
 ## Installation
 
 ```
-go install -u github.com/slytomcat/ws
+go install github.com/slytomcat/ws@latest
 ```
 
 Or download compiled binary (ELF 64-bit LSB executable, x86-64) from assests of [releases](https://github.com/slytomcat/ws/releases)
