@@ -37,7 +37,7 @@ func main() {
 	rootCmd.Flags().BoolVarP(&options.insecure, "insecure", "k", false, "skip ssl certificate check")
 	rootCmd.Flags().StringVarP(&options.subProtocals, "subprotocal", "s", "", "sec-websocket-protocal field")
 	rootCmd.Flags().BoolVarP(&options.timestamp, "timestamp", "t", false, "print timestamps for sent and incoming messages")
-	rootCmd.Flags().BoolVarP(&options.binAsText, "bit2tesxt", "b", false, "print binary message as text")
+	rootCmd.Flags().BoolVarP(&options.binAsText, "bin2text", "b", false, "print binary message as text")
 
 	rootCmd.Execute()
 }

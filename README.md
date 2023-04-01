@@ -33,7 +33,7 @@ Usage:
   ws URL [flags]
 
 Flags:
-  -b, --bit2tesxt            print binary message as text
+  -b, --bin2text             print binary message as text
   -h, --help                 help for ws
   -k, --insecure             skip ssl certificate check
   -o, --origin string        websocket origin
