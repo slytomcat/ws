@@ -38,7 +38,9 @@ Flags:
   -b, --bin2text             print binary message as text
   -h, --help                 help for ws
   -k, --insecure             skip ssl certificate check
+  -i, --interval duration    send ping each interval (ex: 20s)
   -o, --origin string        websocket origin
+  -p, --pingPong             print out ping/pong messages
   -s, --subprotocal string   sec-websocket-protocal field
   -t, --timestamp            print timestamps for sent and incoming messages
   -v, --version              print version

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/hex"
 	"fmt"
@@ -15,14 +16,17 @@ import (
 
 // Session is the WS session
 type Session struct {
-	ws      *websocket.Conn
-	rl      *readline.Instance
-	errChan chan error
+	ws     *websocket.Conn
+	rl     *readline.Instance
+	cancel func()
+	ctx    context.Context
+	err    error
 }
 
 var (
 	rxSprintf = color.New(color.FgGreen).SprintfFunc()
 	txSprintf = color.New(color.FgBlue).SprintfFunc()
+	ctSprintf = color.New(color.FgRed).SprintfFunc()
 )
 
 const tsFormat = "20060102T150405.999"
@@ -62,28 +66,63 @@ func connect(url string, rlConf *readline.Config) error {
 	defer rl.Close()
 
 	session := &Session{
-		ws:      ws,
-		rl:      rl,
-		errChan: make(chan error),
+		ws: ws,
+		rl: rl,
 	}
-
+	session.ctx, session.cancel = context.WithCancel(context.Background())
+	if options.pingPong {
+		ws.SetPingHandler(func(appData string) error {
+			fmt.Fprint(rl.Stdout(), ctSprintf("%s < ping: %s\n", getPrefix(), appData))
+			err := ws.WriteControl(websocket.PongMessage, []byte(appData), time.Now().Add(time.Second))
+			if err != nil {
+				return err
+			}
+			fmt.Fprint(rl.Stdout(), ctSprintf("%s > pong: %s\n", getPrefix(), appData))
+			return nil
+		})
+	}
+	if options.pingInterval != 0 {
+		ws.SetPongHandler(func(appData string) error {
+			fmt.Fprint(rl.Stdout(), ctSprintf("%s < pong\n", getPrefix()))
+			return nil
+		})
+		ticker := time.NewTicker(options.pingInterval)
+		defer ticker.Stop()
+		go func() {
+			for {
+				select {
+				case <-session.ctx.Done():
+					return
+				case <-ticker.C:
+					err := ws.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(time.Second))
+					if err != nil {
+						fmt.Printf("ping sending error: `%v`", err)
+						session.err = err
+						return
+					}
+					fmt.Fprint(rl.Stdout(), ctSprintf("%s > ping\n", getPrefix()))
+				}
+			}
+		}()
+	}
 	go session.readConsole()
 	go session.readWebsocket()
-
-	return <-session.errChan
+	<-session.ctx.Done()
+	return session.err
 }
 
 func (s *Session) readConsole() {
+	defer s.cancel()
 	for {
 		line, err := s.rl.Readline()
 		if err != nil {
-			s.errChan <- err
+			s.err = err
 			return
 		}
 
 		err = s.ws.WriteMessage(websocket.TextMessage, []byte(line))
 		if err != nil {
-			s.errChan <- err
+			s.err = fmt.Errorf("writing error: `%w`", err)
 			return
 		}
 		if options.timestamp { // repeat sent massage only if timestamp is required
@@ -93,10 +132,11 @@ func (s *Session) readConsole() {
 }
 
 func (s *Session) readWebsocket() {
+	defer s.cancel()
 	for {
 		msgType, buf, err := s.ws.ReadMessage()
 		if err != nil {
-			s.errChan <- err
+			s.err = fmt.Errorf("reading error: `%w`", err)
 			return
 		}
 
@@ -111,7 +151,7 @@ func (s *Session) readWebsocket() {
 				text = "\n" + hex.Dump(buf)
 			}
 		default:
-			s.errChan <- fmt.Errorf("unknown websocket frame type: %d", msgType)
+			s.err = fmt.Errorf("unknown websocket frame type: %d", msgType)
 			return
 		}
 		fmt.Fprint(s.rl.Stdout(), rxSprintf("%s< %s\n", getPrefix(), text))
