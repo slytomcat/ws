@@ -35,7 +35,6 @@ jobs:
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
       - name: Download Artifacts
         uses: actions/download-artifact@v3
         with:
