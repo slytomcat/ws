@@ -15,18 +15,20 @@ import (
 )
 
 // Version is app version
-var version = ""
-
-var options struct {
-	origin       string
-	printVersion bool
-	insecure     bool
-	subProtocals string
-	timestamp    bool
-	binAsText    bool
-	pingPong     bool
-	pingInterval time.Duration
-}
+var (
+	version = ""
+	options struct {
+		origin       string
+		printVersion bool
+		insecure     bool
+		subProtocals string
+		initMsg      string
+		timestamp    bool
+		binAsText    bool
+		pingPong     bool
+		pingInterval time.Duration
+	}
+)
 
 func main() {
 	rootCmd := &cobra.Command{
@@ -42,7 +44,7 @@ func main() {
 	rootCmd.Flags().BoolVarP(&options.binAsText, "bin2text", "b", false, "print binary message as text")
 	rootCmd.Flags().BoolVarP(&options.pingPong, "pingPong", "p", false, "print out ping/pong messages")
 	rootCmd.Flags().DurationVarP(&options.pingInterval, "interval", "i", 0, "send ping each interval (ex: 20s)")
-
+	rootCmd.Flags().StringVarP(&options.initMsg, "init", "m", "", "connection init message")
 	rootCmd.Execute()
 }
 
@@ -51,18 +53,15 @@ func root(cmd *cobra.Command, args []string) {
 		fmt.Printf("ws v.%s\n", version)
 		os.Exit(0)
 	}
-
 	if len(args) != 1 {
 		cmd.Help()
 		os.Exit(1)
 	}
-
 	dest, err := url.Parse(args[0])
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-
 	if options.origin == "" {
 		originURL := *dest
 		if dest.Scheme == "wss" {
@@ -78,15 +77,21 @@ func root(cmd *cobra.Command, args []string) {
 	if err == nil {
 		historyFile = filepath.Join(user.HomeDir, ".ws_history")
 	}
-
-	err = connect(dest.String(), &readline.Config{
+	errs := connect(dest.String(), &readline.Config{
 		Prompt:      "> ",
 		HistoryFile: historyFile,
 	})
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		if errors.Is(err, io.EOF) && !errors.Is(err, readline.ErrInterrupt) {
-			os.Exit(1)
+	if len(errs) > 0 {
+		fmt.Println()
+		exCode := 1
+		for _, err := range errs {
+			if !errors.Is(err, io.EOF) {
+				fmt.Fprintln(os.Stderr, err)
+			}
+			if errors.Is(err, readline.ErrInterrupt) {
+				exCode = 0
+			}
 		}
+		os.Exit(exCode)
 	}
 }
