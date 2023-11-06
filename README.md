@@ -37,12 +37,12 @@ EOF
 Flags:
   -b, --bin2text             print binary message as text
   -h, --help                 help for ws
+  -m, --init string          connection init message
   -k, --insecure             skip ssl certificate check
   -i, --interval duration    send ping each interval (ex: 20s)
-  -o, --origin string        websocket origin
+  -o, --origin string        websocket origin (default value is formed from URL)
   -p, --pingPong             print out ping/pong messages
   -s, --subprotocal string   sec-websocket-protocal field
   -t, --timestamp            print timestamps for sent and incoming messages
-  -v, --version              print version
-  
+  -v, --version              print version  
 ```
