@@ -1,9 +1,7 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"io"
 	"net/url"
 	"os"
 	"os/user"
@@ -16,7 +14,7 @@ import (
 
 // Version is app version
 var (
-	version = ""
+	version = "local build"
 	options struct {
 		origin       string
 		printVersion bool
@@ -36,7 +34,7 @@ func main() {
 		Short: fmt.Sprintf("ws is a websocket client v.%s", version),
 		Run:   root,
 	}
-	rootCmd.Flags().StringVarP(&options.origin, "origin", "o", "", "websocket origin")
+	rootCmd.Flags().StringVarP(&options.origin, "origin", "o", "", "websocket origin (default value is formed from URL)")
 	rootCmd.Flags().BoolVarP(&options.printVersion, "version", "v", false, "print version")
 	rootCmd.Flags().BoolVarP(&options.insecure, "insecure", "k", false, "skip ssl certificate check")
 	rootCmd.Flags().StringVarP(&options.subProtocals, "subprotocal", "s", "", "sec-websocket-protocal field")
@@ -83,15 +81,9 @@ func root(cmd *cobra.Command, args []string) {
 	})
 	if len(errs) > 0 {
 		fmt.Println()
-		exCode := 1
 		for _, err := range errs {
-			if !errors.Is(err, io.EOF) {
-				fmt.Fprintln(os.Stderr, err)
-			}
-			if errors.Is(err, readline.ErrInterrupt) {
-				exCode = 0
-			}
+			fmt.Println(err)
 		}
-		os.Exit(exCode)
+		os.Exit(1)
 	}
 }

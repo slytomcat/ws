@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -76,13 +78,11 @@ func connect(url string, rlConf *readline.Config) []error {
 		return []error{err}
 	}
 	defer ws.Close()
-
 	rl, err := readline.NewEx(rlConf)
 	if err != nil {
 		return []error{err}
 	}
 	defer rl.Close()
-
 	session := &Session{
 		ws:     ws,
 		rl:     rl,
@@ -156,7 +156,9 @@ func (s *Session) readConsole() {
 	for {
 		line, err := s.rl.Readline()
 		if err != nil {
-			s.setErr(err)
+			if !(errors.Is(err, readline.ErrInterrupt) || errors.Is(err, io.EOF)) {
+				s.setErr(err)
+			}
 			return
 		}
 		if err = s.sendMsg(line); err != nil {
