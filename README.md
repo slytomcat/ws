@@ -28,14 +28,15 @@ $ ws ws://localhost:3000/ws
 < {"type":"broadcast","payload":"Hello, world"}
 < {"type":"broadcastResult","payload":"Hello, world","listenerCount":1}
 > ^D
-EOF
 ```
 
 ## Other possible options
 
 ```
 Flags:
+  -a, --auth string          auth header value, like 'Bearer $TOKEN'
   -b, --bin2text             print binary message as text
+  -c, --compression          enable compression
   -h, --help                 help for ws
   -m, --init string          connection init message
   -k, --insecure             skip ssl certificate check
@@ -43,6 +44,6 @@ Flags:
   -o, --origin string        websocket origin (default value is formed from URL)
   -p, --pingPong             print out ping/pong messages
   -s, --subprotocal string   sec-websocket-protocal field
-  -t, --timestamp            print timestamps for sent and incoming messages
+  -t, --timestamp            print timestamps for sent and received messages
   -v, --version              print version  
 ```

@@ -63,13 +63,16 @@ func getPrefix() string {
 func connect(url string, rlConf *readline.Config) []error {
 	headers := make(http.Header)
 	headers.Add("Origin", options.origin)
-
+	if options.authHeader != "" {
+		headers.Add("Authorization", options.authHeader)
+	}
 	dialer := websocket.Dialer{
 		Proxy: http.ProxyFromEnvironment,
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: options.insecure,
 		},
-		Subprotocols: []string{options.subProtocals},
+		EnableCompression: options.compression,
+		Subprotocols:      []string{options.subProtocals},
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
