@@ -37,6 +37,7 @@ Flags:
   -a, --auth string          auth header value, like 'Bearer $TOKEN'
   -b, --bin2text             print binary message as text
   -c, --compression          enable compression
+  -f, --filter string        only messages that match regexp will be printed
   -h, --help                 help for ws
   -m, --init string          connection init message
   -k, --insecure             skip ssl certificate check

@@ -194,6 +194,9 @@ func (s *Session) readWebsocket() {
 			s.setErr(fmt.Errorf("unknown websocket frame type: %d", msgType))
 			return
 		}
+		if options.filter != nil && !options.filter.MatchString(text) {
+			continue
+		}
 		fmt.Fprint(s.rl.Stdout(), rxSprintf("%s< %s\n", getPrefix(), text))
 	}
 }

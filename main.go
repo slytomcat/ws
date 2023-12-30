@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/chzyer/readline"
@@ -27,7 +28,9 @@ var (
 		pingPong     bool
 		compression  bool
 		pingInterval time.Duration
+		filter       *regexp.Regexp
 	}
+	filter string
 )
 
 func main() {
@@ -47,6 +50,7 @@ func main() {
 	rootCmd.Flags().DurationVarP(&options.pingInterval, "interval", "i", 0, "send ping each interval (ex: 20s)")
 	rootCmd.Flags().StringVarP(&options.initMsg, "init", "m", "", "connection init message")
 	rootCmd.Flags().BoolVarP(&options.compression, "compression", "c", false, "enable compression")
+	rootCmd.Flags().StringVarP(&filter, "filter", "f", "", "only messages that match regexp will be printed")
 	rootCmd.Execute()
 }
 
@@ -73,7 +77,13 @@ func root(cmd *cobra.Command, args []string) {
 		}
 		options.origin = originURL.String()
 	}
-
+	if len(filter) > 0 {
+		options.filter, err = regexp.Compile(filter)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "compiling regexp '%s' error: %v", filter, err)
+			os.Exit(1)
+		}
+	}
 	var historyFile string
 	user, err := user.Current()
 	if err == nil {
