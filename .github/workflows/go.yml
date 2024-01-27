@@ -8,24 +8,17 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
-          go-version: 1.20.5
-      - name: Cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            /home/runner/.cache/go-build/
-            /home/runner/go/pkg/mod/
-          key: GO_MOD_CACHE
+          go-version-file: './go.mod'
       - name: Requirements
         run: sudo apt-get install upx-ucl
       - name: Build
         run: ./build.sh
       - name: Upload a Build Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: build_artifacts
           path: |
@@ -35,9 +28,9 @@ jobs:
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Download Artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: build_artifacts
       - name: Draft new release and upload assets
