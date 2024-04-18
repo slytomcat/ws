@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
 	"sync"
 	"time"
@@ -80,7 +82,10 @@ func connect(url string, rlConf *readline.Config) []error {
 	if err != nil {
 		return []error{err}
 	}
-	defer ws.Close()
+	defer func() {
+		TryCloseNormally(ws, "client disconnection")
+		ws.Close()
+	}()
 	rl, err := readline.NewEx(rlConf)
 	if err != nil {
 		return []error{err}
@@ -116,6 +121,14 @@ func connect(url string, rlConf *readline.Config) []error {
 			return []error{err}
 		}
 	}
+	go func() {
+		sig := make(chan os.Signal, 2)
+		signal.Notify(sig, os.Interrupt, os.Kill)
+		fmt.Printf("\n%s signal received, exiting...\n", <-sig)
+		rl.Close()
+		session.cancel()
+	}()
+
 	go session.readConsole()
 	go session.readWebsocket()
 	<-session.ctx.Done()
@@ -199,4 +212,16 @@ func (s *Session) readWebsocket() {
 		}
 		fmt.Fprint(s.rl.Stdout(), rxSprintf("%s< %s\n", getPrefix(), text))
 	}
+}
+
+// TryCloseNormally tries to close websocket connection normally i.e. according to RFC
+// NOTE It doesn't close underlying connection as socket reader have to read and handle close response.
+func TryCloseNormally(conn *websocket.Conn, message string) error {
+	closeMessage := websocket.FormatCloseMessage(websocket.CloseNormalClosure, message)
+	if err := conn.WriteControl(websocket.CloseMessage, closeMessage, time.Now().Add(time.Second)); err != nil {
+		if !strings.Contains(err.Error(), "close sent") {
+			return err
+		}
+	}
+	return nil
 }

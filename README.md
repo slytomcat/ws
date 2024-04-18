@@ -20,8 +20,9 @@ ws URL [flags]
 
 Simply run ws with the destination URL. For security some sites check the origin header. ws will automatically send the destination URL as the origin. If this doesn't work you can specify it directly with the `--origin` option.
 
+Example of usage with echo server (see below):
 ```
-$ ws ws://localhost:3000/ws
+$ ws ws://localhost:8080/ws
 > {"type": "echo", "payload": "Hello, world"}
 < {"type":"echo","payload":"Hello, world"}
 > {"type": "broadcast", "payload": "Hello, world"}
@@ -47,4 +48,37 @@ Flags:
   -s, --subprotocal string   sec-websocket-protocal field
   -t, --timestamp            print timestamps for sent and received messages
   -v, --version              print version  
+```
+
+# Echo server
+
+Folder `echo-server` contains a very simple echo server. It allows to establish ws connection and just replay with received messages or send the message to all active connection. Server accept messages in JSON format (like `{"type": "echo", "payload": "Hello, world"}`). 
+
+Only wto types allowed:
+  - `echo` - the message replayed to sender only
+  - `broadcast` - the message is sent to all active connection and the result of broadcasting is sent to sender. 
+
+## build
+
+```
+cd echo-server
+go build .
+```
+
+## start
+
+```
+./echo-server ws://localhost:8080/ws
+```
+
+## test
+
+```
+ws ws://localhost:8080/ws
+> {"type": "echo", "payload": "Hello, world"}
+< {"type":"echo","payload":"Hello, world"}
+> {"type": "broadcast", "payload": "Hello, world"}
+< {"type":"broadcast","payload":"Hello, world"}
+< {"type":"broadcastResult","payload":"Hello, world","listenerCount":1}
+> ^D
 ```
