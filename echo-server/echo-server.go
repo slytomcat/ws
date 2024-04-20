@@ -1,3 +1,4 @@
+// build
 package main
 
 import (
@@ -39,28 +40,28 @@ func main() {
 	}
 	srv.WSHandleFunc(u.Path, func(conn *websocket.Conn) {
 		in := msg{}
-		id := conn.RemoteAddr().String()
+		addr := conn.RemoteAddr().String()
 		for {
 			_, message, err := conn.ReadMessage()
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure, websocket.CloseServiceRestart) {
-					fmt.Printf("echoHandler for %s: websocket reading error: %v\n", id, err)
+					fmt.Printf("echoHandler for %s: websocket reading error: %v\n", addr, err)
 				} else {
-					fmt.Printf("echoHandler for %s: %s\n", id, err)
+					fmt.Printf("echoHandler for %s: %s\n", addr, err)
 				}
 				return
 			}
-			fmt.Printf("echoHandler for %s: handle message: %s\n", id, message)
+			fmt.Printf("echoHandler for %s: handle message: %s\n", addr, message)
 			if err := json.Unmarshal(message, &in); err != nil {
 				sendMsg(msg{"error", fmt.Sprintf("message parsing error: %v", err), nil}, conn)
 				continue
 			}
 			switch in.Type {
 			case "echo":
-				sendMsg(msg{in.Type, in.Payload, nil}, conn)
+				sendMsg(in, conn)
 			case "broadcast":
 				count := 0
-				out, _ := json.Marshal(msg{in.Type, in.Payload, nil})
+				out, _ := json.Marshal(in)
 				srv.ForEachConnection(func(c *websocket.Conn) bool {
 					c.WriteMessage(websocket.TextMessage, out)
 					count++

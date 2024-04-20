@@ -62,7 +62,7 @@ Only wto types allowed:
 
 ```
 cd echo-server
-go build .
+./build.sh
 ```
 
 ## start

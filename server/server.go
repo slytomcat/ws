@@ -86,18 +86,18 @@ func (s *Server) serve(handler func(*websocket.Conn)) func(w http.ResponseWriter
 			return
 		}
 		addr := connection.RemoteAddr().String()
-		fmt.Printf("server: new WS connection from %v\n", addr)
+		fmt.Printf("server: new WS connection from %s\n", addr)
 		s.connections.Store(connection, nil)
 		handler(connection)
 		s.connections.Delete(connection)
-		fmt.Printf("server: WS connection from %v closed\n", addr)
+		fmt.Printf("server: WS connection from %s closed\n", addr)
 		connection.Close()
 	}
 }
 
 // ForEachConnection allow to iterate over all active connections
 func (s *Server) ForEachConnection(f func(*websocket.Conn) bool) {
-	s.connections.Range(func(key, value any) bool {
+	s.connections.Range(func(key, _ any) bool {
 		return f(key.(*websocket.Conn))
 	})
 }
