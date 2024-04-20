@@ -62,10 +62,9 @@ func main() {
 			case "broadcast":
 				count := 0
 				out, _ := json.Marshal(in)
-				srv.ForEachConnection(func(c *websocket.Conn) bool {
+				srv.ForEachConnection(func(c *websocket.Conn) {
 					c.WriteMessage(websocket.TextMessage, out)
 					count++
-					return true
 				})
 				sendMsg(msg{"broadcastResult", in.Payload, &count}, conn)
 			default:

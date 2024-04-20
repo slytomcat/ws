@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -9,14 +10,6 @@ import (
 
 	"github.com/gorilla/websocket"
 )
-
-var upgrader = websocket.Upgrader{
-	HandshakeTimeout: time.Second,
-	Subprotocols:     []string{},
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
-}
 
 // Server is a websocket/http server. It is wrapper for standard http.Server with additional functionality for websocket request handling.
 type Server struct {
@@ -34,8 +27,14 @@ type Server struct {
 func NewServer(addr string) *Server {
 	mux := http.NewServeMux()
 	return &Server{
-		mux:      mux,
-		Upgrader: upgrader,
+		mux: mux,
+		Upgrader: websocket.Upgrader{
+			HandshakeTimeout: time.Second,
+			Subprotocols:     []string{},
+			CheckOrigin: func(r *http.Request) bool {
+				return true
+			},
+		},
 		Server: http.Server{
 			Addr:    addr,
 			Handler: mux,
@@ -53,16 +52,17 @@ func (s *Server) HandleFunc(path string, handler func(w http.ResponseWriter, r *
 	s.mux.HandleFunc(path, handler)
 }
 
-// Close correctly closes all active ws connections and close the server
+// Close correctly closes all active ws connections and shutdown the server
 func (s *Server) Close() error {
-	s.ForEachConnection(func(c *websocket.Conn) bool {
+	s.ForEachConnection(func(c *websocket.Conn) {
 		if err := TryCloseNormally(c, "server going down"); err != nil {
 			fmt.Printf("server: closing connection from %s error: %v\n", c.RemoteAddr(), err)
 		}
 		c.Close()
-		return true
 	})
-	return s.Server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	return s.Server.Shutdown(ctx)
 }
 
 // TryCloseNormally tries to close websocket connection normally i.e. according to RFC
@@ -80,7 +80,7 @@ func TryCloseNormally(conn *websocket.Conn, message string) error {
 
 func (s *Server) serve(handler func(*websocket.Conn)) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		connection, err := upgrader.Upgrade(w, r, nil)
+		connection, err := s.Upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			fmt.Printf("server: connection upgrade error: %v\n", err)
 			return
@@ -96,8 +96,9 @@ func (s *Server) serve(handler func(*websocket.Conn)) func(w http.ResponseWriter
 }
 
 // ForEachConnection allow to iterate over all active connections
-func (s *Server) ForEachConnection(f func(*websocket.Conn) bool) {
-	s.connections.Range(func(key, _ any) bool {
-		return f(key.(*websocket.Conn))
+func (s *Server) ForEachConnection(f func(*websocket.Conn)) {
+	s.connections.Range(func(conn, _ any) bool {
+		f(conn.(*websocket.Conn))
+		return true
 	})
 }
