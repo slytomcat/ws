@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/gorilla/websocket"
 	"github.com/slytomcat/ws/server"
@@ -74,7 +75,7 @@ func main() {
 	})
 	go func() {
 		sig := make(chan os.Signal, 2)
-		signal.Notify(sig, os.Interrupt, os.Kill)
+		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 		fmt.Printf("\n%s signal received, exiting...\n", <-sig)
 		srv.Close()
 	}()

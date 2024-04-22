@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/chzyer/readline"
@@ -123,7 +124,7 @@ func connect(url string, rlConf *readline.Config) []error {
 	}
 	go func() {
 		sig := make(chan os.Signal, 2)
-		signal.Notify(sig, os.Interrupt, os.Kill)
+		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 		fmt.Printf("\n%s signal received, exiting...\n", <-sig)
 		rl.Close()
 		session.cancel()
@@ -190,7 +191,11 @@ func (s *Session) readWebsocket() {
 	for {
 		msgType, buf, err := s.ws.ReadMessage()
 		if err != nil {
-			s.setErr(fmt.Errorf("reading error: `%w`", err))
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure, websocket.CloseServiceRestart) {
+				s.setErr(fmt.Errorf("reading error: `%v`", err))
+			} else {
+				s.setErr(fmt.Errorf("connection closed: %s", err))
+			}
 			return
 		}
 		var text string
