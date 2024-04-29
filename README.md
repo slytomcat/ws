@@ -10,7 +10,7 @@ ws is a simple command line websocket client designed for exploring and debuggin
 go install github.com/slytomcat/ws@latest
 ```
 
-Or download compiled binary (ELF 64-bit LSB executable, x86-64) from assets of [releases](https://github.com/slytomcat/ws/releases)
+Or download compiled binary (compacted ELF 64-bit LSB executable, x86-64) from assets of [releases](https://github.com/slytomcat/ws/releases)
 
 ## Usage
 
@@ -64,6 +64,12 @@ Only wto types allowed:
 cd echo-server
 ./build.sh
 ```
+
+## usage
+```
+echo-server [server_url]
+```
+When `server_url` is not provided then `ws://localhost:8080/ws` is used.  
 
 ## start
 

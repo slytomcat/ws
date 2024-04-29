@@ -1,4 +1,3 @@
-// build
 package main
 
 import (
@@ -14,6 +13,8 @@ import (
 	"github.com/slytomcat/ws/server"
 )
 
+const defaultUrl = "ws://localhost:8080/ws"
+
 type msg struct {
 	Type          string `json:"type,omitempty"`
 	Payload       string `json:"payload,omitempty"`
@@ -26,16 +27,23 @@ func sendMsg(m msg, c *websocket.Conn) {
 }
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Printf("Usage: %s ws://host[:port][/path]", os.Args[0])
-		os.Exit(1)
+	DoMain(os.Args)
+}
+
+var srv *server.Server
+
+// DoMain is main with os.Args as parameter
+func DoMain(args []string) {
+	raw := defaultUrl
+	if len(args) > 1 {
+		raw = args[1]
 	}
-	u, err := url.Parse(os.Args[1])
+	u, err := url.Parse(raw)
 	if err != nil {
 		fmt.Printf("url parsing error: %v", err)
 		os.Exit(1)
 	}
-	srv := server.NewServer(u.Host)
+	srv = server.NewServer(u.Host)
 	if !strings.HasPrefix(u.Path, "/") {
 		u.Path = "/" + u.Path
 	}
@@ -75,7 +83,7 @@ func main() {
 	})
 	go func() {
 		sig := make(chan os.Signal, 2)
-		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 		fmt.Printf("\n%s signal received, exiting...\n", <-sig)
 		srv.Close()
 	}()
