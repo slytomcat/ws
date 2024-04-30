@@ -30,6 +30,8 @@ type Session struct {
 	errLock sync.Mutex
 }
 
+var session *Session
+
 func (s *Session) setErr(err error) {
 	s.errLock.Lock()
 	defer s.errLock.Unlock()
@@ -92,7 +94,7 @@ func connect(url string, rlConf *readline.Config) []error {
 		return []error{err}
 	}
 	defer rl.Close()
-	session := &Session{
+	session = &Session{
 		ws:     ws,
 		rl:     rl,
 		ctx:    ctx,
