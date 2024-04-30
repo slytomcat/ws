@@ -65,7 +65,7 @@ func getPrefix() string {
 	return ""
 }
 
-func connect(url string, rlConf *readline.Config) []error {
+func connect(url string, rl *readline.Instance) []error {
 	headers := make(http.Header)
 	headers.Add("Origin", options.origin)
 	if options.authHeader != "" {
@@ -86,14 +86,10 @@ func connect(url string, rlConf *readline.Config) []error {
 		return []error{err}
 	}
 	defer func() {
+		rl.Close()
 		TryCloseNormally(ws, "client disconnection")
 		ws.Close()
 	}()
-	rl, err := readline.NewEx(rlConf)
-	if err != nil {
-		return []error{err}
-	}
-	defer rl.Close()
 	session = &Session{
 		ws:     ws,
 		rl:     rl,

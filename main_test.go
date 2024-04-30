@@ -1,10 +1,8 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -12,84 +10,21 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/slytomcat/ws/server"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-const mockURL = "ws://localhost:8080"
-
-type mockServer struct {
-	Close    func() error
-	Received chan string
-	ToSend   chan string
-}
-
-func newMockServer() *mockServer {
-	received := make(chan string, 10)
-	toSend := make(chan string, 10)
-	ctx, cancel := context.WithCancel(context.Background())
-	u, _ := url.Parse(mockURL)
-	s := server.NewServer(u.Host)
-	s.WSHandleFunc("/", func(conn *websocket.Conn) {
-		go func() {
-			for {
-				_, msg, err := conn.ReadMessage()
-				if err != nil {
-					return
-				}
-				received <- string(msg)
-			}
-		}()
-		select {
-		case <-ctx.Done():
-			TryCloseNormally(conn, "server going down")
-			return
-		case data := <-toSend:
-			conn.WriteMessage(websocket.TextMessage, []byte(data))
-		}
-	})
-	go s.ListenAndServe()
-	time.Sleep(50 * time.Millisecond)
-	return &mockServer{
-		Close: func() error {
-			cancel()
-			s.Shutdown(ctx)
-			return nil
-		},
-		Received: received,
-		ToSend:   toSend,
-	}
-}
-
-func newMockConn() *websocket.Conn {
-	dial := websocket.Dialer{}
-	conn, _, err := dial.Dial(mockURL, nil)
-	if err != nil {
-		panic(err)
-	}
-	return conn
-}
-
 func TestMockServer(t *testing.T) {
-	s := newMockServer()
+	s := newMockServer(0)
 	defer s.Close()
 	conn := newMockConn()
 	defer TryCloseNormally(conn, "test finished")
 	sent := "test"
 	// test client -> server message
 	require.NoError(t, conn.WriteMessage(websocket.TextMessage, []byte(sent)))
-	var received string
-	require.Eventually(t, func() bool {
-		select {
-		case received = <-s.Received:
-			return true
-		default:
-			return false
-		}
-	}, 20*time.Millisecond, 2*time.Millisecond)
-	require.Equal(t, sent, received)
+	require.Eventually(t, func() bool { return len(s.Received) > 0 }, 20*time.Millisecond, 2*time.Millisecond)
+	require.Equal(t, sent, <-s.Received)
 	// test server -> client message
 	s.ToSend <- sent
 	require.NoError(t, conn.SetReadDeadline(time.Now().Add(20*time.Millisecond)))
@@ -99,15 +34,20 @@ func TestMockServer(t *testing.T) {
 }
 
 func TestWSinitMsg(t *testing.T) {
-	s := newMockServer()
+	s := newMockServer(0)
 	defer s.Close()
 	message := "test message"
 	options.initMsg = message
-	options.authHeader += "Bearer ajshdkjhipuqofqldbclqwehqlieh;#kqnwe;ldk"
-	defer func() { options.initMsg = "" }()
+	options.authHeader = "Bearer the_token_is_here"
+	defer func() {
+		options.initMsg = ""
+		options.authHeader = ""
+	}()
 	cmd := &cobra.Command{}
 	time.AfterFunc(100*time.Millisecond, func() { session.cancel() })
 	root(cmd, []string{mockURL})
+	require.Eventually(t, func() bool { return len(s.Received) > 0 }, 20*time.Millisecond, 2*time.Millisecond)
+	require.Equal(t, message, <-s.Received)
 }
 
 func TestWSconnectFail(t *testing.T) {
