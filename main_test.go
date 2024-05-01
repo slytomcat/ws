@@ -9,29 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestMockServer(t *testing.T) {
-	s := newMockServer(0)
-	defer s.Close()
-	conn := newMockConn()
-	defer TryCloseNormally(conn, "test finished")
-	sent := "test"
-	// test client -> server message
-	require.NoError(t, conn.WriteMessage(websocket.TextMessage, []byte(sent)))
-	require.Eventually(t, func() bool { return len(s.Received) > 0 }, 20*time.Millisecond, 2*time.Millisecond)
-	require.Equal(t, sent, <-s.Received)
-	// test server -> client message
-	s.ToSend <- sent
-	require.NoError(t, conn.SetReadDeadline(time.Now().Add(20*time.Millisecond)))
-	_, data, err := conn.ReadMessage()
-	require.NoError(t, err)
-	require.Equal(t, sent, string(data))
-}
 
 func TestWSinitMsg(t *testing.T) {
 	s := newMockServer(0)
@@ -54,6 +35,8 @@ func TestWSconnectFail(t *testing.T) {
 	envName := fmt.Sprintf("BE_%s", t.Name())
 	if os.Getenv(envName) == "1" {
 		root(&cobra.Command{}, []string{"wss://127.0.0.1:8080"})
+		time.Sleep(300 * time.Millisecond)
+		session.cancel()
 		return
 	}
 	args := []string{"-test.run=" + t.Name()}

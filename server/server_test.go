@@ -53,7 +53,7 @@ func TestHandshakeServerError(t *testing.T) {
 	s := NewServer(":8080")
 	require.NotNil(t, s)
 	s.Upgrader.CheckOrigin = func(r *http.Request) bool { return false }
-	s.WSHandleFunc("/", EchoHandler)
+	defer s.WSHandleFunc("/", EchoHandler)
 	go func() { s.ListenAndServe() }()
 	time.Sleep(50 * time.Millisecond)
 	defer s.Close()
@@ -84,12 +84,12 @@ func TestHandshakeClientError(t *testing.T) {
 func TestRegularHandler(t *testing.T) {
 	s := NewServer("localhost:8080")
 	require.NotNil(t, s)
+	defer s.Close()
 	s.HandleFunc("/ok", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	go func() { s.ListenAndServe() }()
 	time.Sleep(50 * time.Millisecond)
-	defer s.Close()
 	resp, err := http.DefaultClient.Get("http://localhost:8080/ok")
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -100,10 +100,10 @@ func TestForEachConnection(t *testing.T) {
 	fullURL := "ws://localhost:8080"
 	s := NewServer("localhost:8080")
 	require.NotNil(t, s)
+	defer s.Close()
 	s.WSHandleFunc("/", EchoHandler)
 	go func() { s.ListenAndServe() }()
 	time.Sleep(50 * time.Millisecond)
-	defer s.Close()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	sentMsg := []byte("ping")
@@ -137,6 +137,7 @@ func TestForEachConnection(t *testing.T) {
 	require.Equal(t, readers, cnt)
 	err := s.Close()
 	require.NoError(t, err)
+	time.Sleep(5 * time.Millisecond)
 	cnt = 0
 	s.connections.Range(func(_, _ any) bool {
 		cnt++

@@ -62,7 +62,8 @@ func (s *Server) Close() error {
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
-	return s.Server.Shutdown(ctx)
+	s.Server.Shutdown(ctx)
+	return s.Server.Close()
 }
 
 // TryCloseNormally tries to close websocket connection normally i.e. according to RFC

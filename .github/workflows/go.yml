@@ -23,8 +23,36 @@ jobs:
           name: build_artifacts
           path: |
             ws
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: './go.mod'
+      - name: Test ws
+        run: go test -v -coverprofile cover.out .
+      - name: Format ws coverage
+        run: go tool cover -html=cover.out -o coverage.html
+      - name: Test server
+        run: go test -v -coverprofile cover_server.out ./server
+      - name: Format ws coverage
+        run: go tool cover -html=cover_server.out -o coverage_server.html
+      - name: Test ws
+        run: go test -v -coverprofile cover_echo-server.out ./echo-server
+      - name: Format ws coverage
+        run: go tool cover -html=cover_echo-server.out -o coverage_echo-server.html
+      - name: Upload coverage to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage_artifacts
+          path: |
+            coverage.html
+            coverage_server.html
+            coverage_echo-server.html
   push:
-    needs: build
+    needs: [build, test]
     if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:

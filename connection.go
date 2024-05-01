@@ -108,7 +108,7 @@ func connect(url string, rl *readline.Instance) []error {
 			return nil
 		})
 		ws.SetPongHandler(func(appData string) error {
-			fmt.Fprint(rl.Stdout(), ctSprintf("%s < pong\n", getPrefix()))
+			fmt.Fprint(rl.Stdout(), ctSprintf("%s < pong: %s\n", getPrefix(), appData))
 			return nil
 		})
 	}
@@ -149,7 +149,7 @@ func (s *Session) pingHandler() {
 				return
 			}
 			if options.pingPong {
-				fmt.Fprint(s.rl.Stdout(), ctSprintf("%s > ping\n", getPrefix()))
+				fmt.Fprint(s.rl.Stdout(), ctSprintf("%s > ping: \n", getPrefix()))
 			}
 		}
 	}

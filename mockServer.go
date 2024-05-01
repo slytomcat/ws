@@ -29,6 +29,7 @@ func newMockServer(interval time.Duration) *mockServer {
 		Close: func() error {
 			cancel()
 			s.Shutdown(ctx)
+			s.Close()
 			return nil
 		},
 		Received: received,
@@ -36,15 +37,15 @@ func newMockServer(interval time.Duration) *mockServer {
 		Mode:     websocket.TextMessage,
 	}
 	s.WSHandleFunc(u.Path, func(conn *websocket.Conn) {
+		defer conn.Close()
 		if interval != 0 {
 			go func() {
 				ticker := time.NewTicker(interval)
+				defer ticker.Stop()
 				for {
 					select {
 					case <-ticker.C:
-						if err := conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(20*time.Millisecond)); err != nil {
-							return
-						}
+						conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(20*time.Millisecond))
 					case <-ctx.Done():
 						return
 					}
@@ -70,8 +71,15 @@ func newMockServer(interval time.Duration) *mockServer {
 			}
 		}
 	})
-	go s.ListenAndServe()
-	time.Sleep(50 * time.Millisecond)
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- s.ListenAndServe()
+	}()
+	select {
+	case err := <-errCh:
+		panic(err)
+	case <-time.After(50 * time.Millisecond):
+	}
 	return m
 }
 

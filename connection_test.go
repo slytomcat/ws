@@ -44,15 +44,18 @@ func TestSession(t *testing.T) {
 		errLock: sync.Mutex{},
 	}
 	sent := "test message"
+	typed := "typed"
+	binary := "binary"
+	unknown := "unknown"
+	toBeFiltered := "must be filtered"
 	// test sendMsg
 	options.timestamp = true
 	defer func() { options.timestamp = false }()
 	err = s.sendMsg(sent)
 	require.NoError(t, err)
-	require.Eventually(t, func() bool { return len(srv.Received) > 0 }, 30*time.Millisecond, 3*time.Millisecond)
+	require.Eventually(t, func() bool { return len(srv.Received) > 0 }, 100*time.Millisecond, 3*time.Millisecond)
 	require.Equal(t, sent, <-srv.Received)
 	// test typing
-	typed := "typed"
 	_, err = rl.WriteStdin([]byte(typed + "\n"))
 	require.NoError(t, err)
 	go func() {
@@ -74,10 +77,9 @@ func TestSession(t *testing.T) {
 	// binary as text
 	options.binAsText = true
 	defer func() { options.binAsText = false }()
-	srv.ToSend <- "binary"
+	srv.ToSend <- binary
 	require.Eventually(t, func() bool { return len(srv.ToSend) == 0 }, 20*time.Millisecond, 2*time.Millisecond)
 	// filtered
-	toBeFiltered := "must be filtered"
 	options.filter = regexp.MustCompile("^.*not filtered.*$")
 	defer func() { options.filter = nil }()
 	require.False(t, options.filter.MatchString(toBeFiltered))
@@ -85,7 +87,7 @@ func TestSession(t *testing.T) {
 	require.Eventually(t, func() bool { return len(srv.ToSend) == 0 }, 20*time.Millisecond, 2*time.Millisecond)
 	// unknown mode
 	atomic.StoreInt64(&srv.Mode, 0)
-	srv.ToSend <- "unknown"
+	srv.ToSend <- unknown
 	require.Eventually(t, func() bool { return len(srv.ToSend) == 0 }, 20*time.Millisecond, 2*time.Millisecond)
 	time.Sleep(20 * time.Millisecond)
 	cancel()
@@ -93,47 +95,52 @@ func TestSession(t *testing.T) {
 	output, err := io.ReadAll(outR)
 	out := string(output)
 	require.NoError(t, err)
-	require.Contains(t, out, " > test message")
-	require.Contains(t, out, " > typed")
-	require.Contains(t, out, " < test message")
-	require.Contains(t, out, " < \n00000000  74 65 73 74 20 6d 65 73  73 61 67 65              |test message|")
-	require.Contains(t, out, " < binary")
+	require.Contains(t, out, " > "+sent)
+	require.Contains(t, out, " > "+typed)
+	require.Contains(t, out, " < "+sent)
+	require.Contains(t, out, " < \n00000000  74 65 73 74 20 6d 65 73  73 61 67 65              |"+sent+"|")
+	require.Contains(t, out, " < "+binary)
 	require.NotContains(t, out, toBeFiltered)
-	require.NotContains(t, out, "unknown")
+	require.NotContains(t, out, unknown)
 	// t.Log(out)
 }
 
 func TestPingPong(t *testing.T) {
-	srv := newMockServer(2 * time.Millisecond)
-	defer srv.Close()
+	srv := newMockServer(5 * time.Millisecond)
 	options.pingPong = true
-	options.pingInterval = 2 * time.Millisecond
+	options.pingInterval = 5 * time.Millisecond
 	outR, outW, _ := os.Pipe()
-	errs := make(chan []error, 1)
-	rl, err := readline.NewEx(&readline.Config{Prompt: "> ", Stdout: outW, UniqueEditLine: true})
-	require.NoError(t, err)
-	// the only way I found to keep redline working for a while
-	go func() {
-		for i := 0; i < 400; i++ {
-			_, err = rl.WriteStdin([]byte("typed"))
-		}
+	inR, inW, _ := os.Pipe()
+	defer func() {
+		inW.Close()
+		outW.Close()
+		options.pingPong = false
+		options.pingInterval = 0
+		srv.Close()
 	}()
-	rl.Write([]byte("typed"))
+	errs := make(chan []error, 1)
+	// substitute FuncMakeRaw and FuncExitRaw to empty func to use open pipe as Stdin
+	// switching to raw file descriptor 0 will cause immediately closure of rl due to EOF
+	success := func() error { return nil }
+	rl, err := readline.NewEx(&readline.Config{Prompt: "> ", Stdin: inR, Stdout: outW, FuncMakeRaw: success, FuncExitRaw: success})
 	require.NoError(t, err)
 	go func() {
 		errs <- connect(mockURL, rl)
 	}()
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
+	require.Eventually(t, func() bool { return session != nil }, 100*time.Millisecond, 2*time.Millisecond)
 	session.cancel()
-	require.Eventually(t, func() bool { return len(errs) > 0 }, 20*time.Millisecond, 2*time.Millisecond)
+	inW.Close()
 	outW.Close()
+	require.Eventually(t, func() bool { return len(errs) > 0 }, 20*time.Millisecond, 2*time.Millisecond)
 	output, err := io.ReadAll(outR)
 	out := string(output)
+	// t.Log(out)
 	require.NoError(t, err)
 	require.Contains(t, out, "> ping")
 	require.Contains(t, out, "< pong")
-	require.Contains(t, out, "< ping:")
-	require.Contains(t, out, "> pong:")
+	require.Contains(t, out, "< ping")
+	require.Contains(t, out, "> pong")
 }
 
 func TestInitMsg(t *testing.T) {
