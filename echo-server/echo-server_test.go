@@ -42,12 +42,12 @@ func TestEchoServer(t *testing.T) {
 	require.NoError(t, err)
 	cmd.Env = append(os.Environ(), envName+"=1")
 	require.NoError(t, cmd.Start())
-	time.Sleep(50 * time.Millisecond)
 	dialer := websocket.Dialer{}
-	conn, _, err := dialer.Dial(defaultUrl, nil)
-	if err != nil {
-		panic(err)
-	}
+	var conn *websocket.Conn
+	require.Eventually(t, func() bool {
+		conn, _, err = dialer.Dial(defaultUrl, nil)
+		return err == nil
+	}, 50*time.Millisecond, 5*time.Millisecond)
 	testCases := []struct {
 		name      string
 		toSend    string

@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
@@ -89,7 +91,7 @@ func DoMain(args []string) {
 	}()
 	fmt.Printf("starting echo server on %s...\n", u.Host)
 	err = srv.ListenAndServe()
-	if err.Error() != "http: Server closed" {
+	if !errors.Is(err, http.ErrServerClosed) {
 		fmt.Println(err)
 		os.Exit(1)
 	}

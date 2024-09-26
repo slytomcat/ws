@@ -53,9 +53,18 @@ func TestHandshakeServerError(t *testing.T) {
 	s := NewServer(":8080")
 	require.NotNil(t, s)
 	s.Upgrader.CheckOrigin = func(r *http.Request) bool { return false }
-	defer s.WSHandleFunc("/", EchoHandler)
-	go func() { s.ListenAndServe() }()
-	time.Sleep(50 * time.Millisecond)
+	s.WSHandleFunc("/", EchoHandler)
+	errCh := make(chan error, 2)
+	go func() { errCh <- s.ListenAndServe() }()
+	require.Never(t, func() bool {
+		select {
+		case e := <-errCh:
+			t.Log(e)
+			return true
+		default:
+			return false
+		}
+	}, 50*time.Millisecond, 10*time.Millisecond)
 	defer s.Close()
 	dialer := websocket.Dialer{}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -70,15 +79,23 @@ func TestHandshakeClientError(t *testing.T) {
 	require.NotNil(t, s)
 	s.Upgrader.CheckOrigin = func(r *http.Request) bool { return false }
 	s.WSHandleFunc("/", EchoHandler)
-	go func() { s.ListenAndServe() }()
-	time.Sleep(50 * time.Millisecond)
+	errCh := make(chan error, 2)
+	go func() { errCh <- s.ListenAndServe() }()
+	require.Never(t, func() bool {
+		select {
+		case e := <-errCh:
+			t.Log(e)
+			return true
+		default:
+			return false
+		}
+	}, 50*time.Millisecond, 10*time.Millisecond)
 	defer s.Close()
 	dialer := websocket.Dialer{HandshakeTimeout: time.Nanosecond}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	_, _, err := dialer.DialContext(ctx, fullURL, nil)
 	require.EqualError(t, err, "dial tcp :8080: i/o timeout")
-
 }
 
 func TestRegularHandler(t *testing.T) {
@@ -88,12 +105,20 @@ func TestRegularHandler(t *testing.T) {
 	s.HandleFunc("/ok", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	go func() { s.ListenAndServe() }()
-	time.Sleep(50 * time.Millisecond)
+	errCh := make(chan error, 2)
+	go func() { errCh <- s.ListenAndServe() }()
+	require.Never(t, func() bool {
+		select {
+		case e := <-errCh:
+			t.Log(e)
+			return true
+		default:
+			return false
+		}
+	}, 50*time.Millisecond, 10*time.Millisecond)
 	resp, err := http.DefaultClient.Get("http://localhost:8080/ok")
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
-
 }
 
 func TestForEachConnection(t *testing.T) {
@@ -102,8 +127,17 @@ func TestForEachConnection(t *testing.T) {
 	require.NotNil(t, s)
 	defer s.Close()
 	s.WSHandleFunc("/", EchoHandler)
-	go func() { s.ListenAndServe() }()
-	time.Sleep(50 * time.Millisecond)
+	errCh := make(chan error, 2)
+	go func() { errCh <- s.ListenAndServe() }()
+	require.Never(t, func() bool {
+		select {
+		case e := <-errCh:
+			t.Log(e)
+			return true
+		default:
+			return false
+		}
+	}, 50*time.Millisecond, 10*time.Millisecond)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	sentMsg := []byte("ping")
@@ -111,7 +145,7 @@ func TestForEachConnection(t *testing.T) {
 	readCh := make(chan []byte, readers)
 	wg := sync.WaitGroup{}
 	wg.Add(readers)
-	for i := 0; i < readers; i++ {
+	for range readers {
 		go func() {
 			defer wg.Done()
 			dialer := websocket.Dialer{}
@@ -122,23 +156,24 @@ func TestForEachConnection(t *testing.T) {
 			readCh <- msg
 		}()
 	}
-	time.Sleep(50 * time.Millisecond)
+	require.Eventually(t, func() bool {
+		cnt := 0
+		s.connections.Range(func(_, _ any) bool { cnt++; return true })
+		return cnt == readers
+	}, 10*time.Millisecond, 2*time.Millisecond)
 	s.ForEachConnection(func(c *websocket.Conn) {
 		err := c.WriteMessage(websocket.TextMessage, sentMsg)
 		assert.NoError(t, err)
 	})
 	wg.Wait()
 	close(readCh)
-	cnt := 0
+	require.Len(t, readCh, readers)
 	for msg := range readCh {
 		assert.Equal(t, sentMsg, msg)
-		cnt++
 	}
-	require.Equal(t, readers, cnt)
 	err := s.Close()
 	require.NoError(t, err)
-	time.Sleep(5 * time.Millisecond)
-	cnt = 0
+	cnt := 0
 	s.connections.Range(func(_, _ any) bool {
 		cnt++
 		return true

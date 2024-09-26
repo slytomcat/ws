@@ -45,7 +45,6 @@ func TestMockServerPing(t *testing.T) {
 	conn.ReadMessage()
 	require.Greater(t, atomic.LoadInt64(&pingCount), int64(3))
 	s.Close()
-	time.Sleep(20 * time.Millisecond)
 }
 
 func TestMockServerDoubleStart(t *testing.T) {
