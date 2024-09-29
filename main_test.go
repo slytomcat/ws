@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -25,7 +26,9 @@ func TestWSinitMsg(t *testing.T) {
 		options.authHeader = ""
 	}()
 	cmd := &cobra.Command{}
-	time.AfterFunc(100*time.Millisecond, func() { session.cancel() })
+	ctx, cancel := context.WithCancel(context.Background())
+	cmd.SetContext(ctx)
+	time.AfterFunc(100*time.Millisecond, func() { cancel() })
 	root(cmd, []string{mockURL})
 	require.Eventually(t, func() bool { return len(s.Received) > 0 }, 20*time.Millisecond, 2*time.Millisecond)
 	require.Equal(t, message, <-s.Received)
@@ -34,9 +37,12 @@ func TestWSinitMsg(t *testing.T) {
 func TestWSconnectFail(t *testing.T) {
 	envName := fmt.Sprintf("BE_%s", t.Name())
 	if os.Getenv(envName) == "1" {
-		root(&cobra.Command{}, []string{"wss://127.0.0.1:8080"})
+		ctx, cancel := context.WithCancel(context.Background())
+		cmd := &cobra.Command{}
+		cmd.SetContext(ctx)
+		root(cmd, []string{"wss://127.0.0.1:8080"})
 		time.Sleep(300 * time.Millisecond)
-		session.cancel()
+		cancel()
 		return
 	}
 	args := []string{"-test.run=" + t.Name()}

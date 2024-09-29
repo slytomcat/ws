@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"io"
 	"os"
 	"regexp"
@@ -31,15 +30,13 @@ func TestSession(t *testing.T) {
 	defer srv.Close()
 	conn := newMockConn()
 	defer TryCloseNormally(conn, "test finished")
-	ctx, cancel := context.WithCancel(context.Background())
 	outR, outW, _ := os.Pipe()
 	rl, err := readline.NewEx(&readline.Config{Prompt: "> ", Stdout: outW})
 	require.NoError(t, err)
 	s := Session{
 		ws:      conn,
 		rl:      rl,
-		cancel:  cancel,
-		ctx:     ctx,
+		cancel:  func() {},
 		errors:  []error{},
 		errLock: sync.Mutex{},
 	}
@@ -90,7 +87,6 @@ func TestSession(t *testing.T) {
 	srv.ToSend <- unknown
 	require.Eventually(t, func() bool { return len(srv.ToSend) == 0 }, 20*time.Millisecond, 2*time.Millisecond)
 	time.Sleep(20 * time.Millisecond)
-	cancel()
 	outW.Close()
 	output, err := io.ReadAll(outR)
 	out := string(output)
@@ -124,12 +120,13 @@ func TestPingPong(t *testing.T) {
 	success := func() error { return nil }
 	rl, err := readline.NewEx(&readline.Config{Prompt: "> ", Stdin: inR, Stdout: outW, FuncMakeRaw: success, FuncExitRaw: success})
 	require.NoError(t, err)
+	s := &Session{rl: rl}
 	go func() {
-		errs <- connect(mockURL, rl)
+		errs <- s.connect(mockURL)
 	}()
 	time.Sleep(20 * time.Millisecond)
-	require.Eventually(t, func() bool { return session != nil }, 100*time.Millisecond, 2*time.Millisecond)
-	session.cancel()
+	require.Eventually(t, func() bool { return s.cancel != nil }, 100*time.Millisecond, 2*time.Millisecond)
+	s.cancel()
 	inW.Close()
 	outW.Close()
 	require.Eventually(t, func() bool { return len(errs) > 0 }, 20*time.Millisecond, 2*time.Millisecond)
@@ -144,8 +141,8 @@ func TestPingPong(t *testing.T) {
 }
 
 func TestInitMsg(t *testing.T) {
-	s := newMockServer(0)
-	defer s.Close()
+	m := newMockServer(0)
+	defer m.Close()
 	message := "test message"
 	options.initMsg = message
 	defer func() {
@@ -153,9 +150,10 @@ func TestInitMsg(t *testing.T) {
 	}()
 	rl, err := readline.New(" >")
 	require.NoError(t, err)
-	time.AfterFunc(500*time.Millisecond, func() { session.cancel() })
-	errs := connect(mockURL, rl)
+	s := &Session{rl: rl}
+	time.AfterFunc(500*time.Millisecond, func() { s.cancel() })
+	errs := s.connect(mockURL)
 	require.Empty(t, errs)
-	require.Eventually(t, func() bool { return len(s.Received) > 0 }, 20*time.Millisecond, 2*time.Millisecond)
-	require.Equal(t, message, <-s.Received)
+	require.Eventually(t, func() bool { return len(m.Received) > 0 }, 20*time.Millisecond, 2*time.Millisecond)
+	require.Equal(t, message, <-m.Received)
 }

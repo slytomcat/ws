@@ -25,12 +25,9 @@ type Session struct {
 	ws      *websocket.Conn
 	rl      *readline.Instance
 	cancel  func()
-	ctx     context.Context
 	errors  []error
 	errLock sync.Mutex
 }
-
-var session *Session
 
 func (s *Session) setErr(err error) {
 	s.errLock.Lock()
@@ -65,7 +62,7 @@ func getPrefix() string {
 	return ""
 }
 
-func connect(url string, rl *readline.Instance) []error {
+func (s *Session) connect(url string) []error {
 	headers := make(http.Header)
 	headers.Add("Origin", options.origin)
 	if options.authHeader != "" {
@@ -86,37 +83,33 @@ func connect(url string, rl *readline.Instance) []error {
 		return []error{err}
 	}
 	defer func() {
-		rl.Close()
+		s.rl.Close()
 		TryCloseNormally(ws, "client disconnection")
 		ws.Close()
 	}()
-	session = &Session{
-		ws:     ws,
-		rl:     rl,
-		ctx:    ctx,
-		cancel: cancel,
-		errors: []error{},
-	}
+	s.ws = ws
+	s.cancel =  cancel
+	s.errors =  []error{}
 	if options.pingPong {
 		ws.SetPingHandler(func(appData string) error {
-			fmt.Fprint(rl.Stdout(), ctSprintf("%s < ping: %s\n", getPrefix(), appData))
+			fmt.Fprint(s.rl.Stdout(), ctSprintf("%s < ping: %s\n", getPrefix(), appData))
 			err := ws.WriteControl(websocket.PongMessage, []byte(appData), time.Now().Add(time.Second))
 			if err != nil {
 				return err
 			}
-			fmt.Fprint(rl.Stdout(), ctSprintf("%s > pong: %s\n", getPrefix(), appData))
+			fmt.Fprint(s.rl.Stdout(), ctSprintf("%s > pong: %s\n", getPrefix(), appData))
 			return nil
 		})
 		ws.SetPongHandler(func(appData string) error {
-			fmt.Fprint(rl.Stdout(), ctSprintf("%s < pong: %s\n", getPrefix(), appData))
+			fmt.Fprint(s.rl.Stdout(), ctSprintf("%s < pong: %s\n", getPrefix(), appData))
 			return nil
 		})
 	}
 	if options.pingInterval != 0 {
-		go session.pingHandler()
+		go s.pingHandler(ctx)
 	}
 	if options.initMsg != "" {
-		if err = session.sendMsg(options.initMsg); err != nil {
+		if err = s.sendMsg(options.initMsg); err != nil {
 			return []error{err}
 		}
 	}
@@ -124,22 +117,22 @@ func connect(url string, rl *readline.Instance) []error {
 		sig := make(chan os.Signal, 2)
 		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 		fmt.Printf("\n%s signal received, exiting...\n", <-sig)
-		rl.Close()
-		session.cancel()
+		s.rl.Close()
+		s.cancel()
 	}()
 
-	go session.readConsole()
-	go session.readWebsocket()
-	<-session.ctx.Done()
-	return session.getErr()
+	go s.readConsole()
+	go s.readWebsocket()
+	<-ctx.Done()
+	return s.getErr()
 }
 
-func (s *Session) pingHandler() {
+func (s *Session) pingHandler(ctx context.Context) {
 	ticker := time.NewTicker(options.pingInterval)
 	defer ticker.Stop()
 	for {
 		select {
-		case <-s.ctx.Done():
+		case <-ctx.Done():
 			return
 		case <-ticker.C:
 			err := s.ws.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(time.Second))

@@ -72,7 +72,7 @@ func TestEchoServer(t *testing.T) {
 			name:   "wrong message type",
 			toSend: `{"type":"wrong", "payload":"Hello world!"}`,
 			toReceive: []string{
-				`{"type":"error","payload":"unknown type"}`,
+				`{"type":"error","payload":"unknown type: wrong"}`,
 			},
 		},
 		{

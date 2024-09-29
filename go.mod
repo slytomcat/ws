@@ -1,6 +1,6 @@
 module github.com/slytomcat/ws
 
-go 1.22.1
+go 1.23.1
 
 require (
 	github.com/chzyer/readline v1.5.1

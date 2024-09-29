@@ -79,7 +79,7 @@ func DoMain(args []string) {
 				})
 				sendMsg(msg{"broadcastResult", in.Payload, &count}, conn)
 			default:
-				sendMsg(msg{"error", "unknown type", nil}, conn)
+				sendMsg(msg{"error", "unknown type: " + in.Type, nil}, conn)
 			}
 		}
 	})

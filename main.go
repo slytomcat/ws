@@ -96,7 +96,8 @@ func root(cmd *cobra.Command, args []string) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	errs := connect(dest.String(), rl)
+	s := &Session{rl: rl}
+	errs := s.connect(dest.String())
 	if len(errs) > 0 {
 		fmt.Println()
 		for _, err := range errs {

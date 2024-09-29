@@ -1,6 +1,6 @@
 # ws
 
-ws is a simple command line websocket client designed for exploring and debugging websocket servers. ws includes readline-style keyboard shortcuts, persistent history, and colorization.
+`ws` is a simple command line websocket client designed for exploring and debugging websocket servers. `ws` includes readline-style keyboard shortcuts, persistent history, and colorization.
 
 ![Example usage recording](https://hashrocket-production.s3.amazonaws.com/uploads/blog/misc/ws/ws.gif)
 
@@ -18,7 +18,7 @@ Or download compiled binary (compacted ELF 64-bit LSB executable, x86-64) from a
 ws URL [flags]
 ```
 
-Simply run ws with the destination URL. For security some sites check the origin header. ws will automatically send the destination URL as the origin. If this doesn't work you can specify it directly with the `--origin` option.
+Simply run `ws` with the destination URL. For security some sites check the origin header. `ws` will automatically send the destination URL as the origin. If this doesn't work you can specify it directly with the `--origin` option.
 
 Example of usage with echo server (see below):
 ```
@@ -54,9 +54,11 @@ Flags:
 
 Folder `echo-server` contains a very simple echo server. It allows to establish ws connection and just replay with received messages or send the message to all active connection. Server accept messages in JSON format (like `{"type": "echo", "payload": "Hello, world"}`). 
 
-Only wto types allowed:
+Only two types of incoming messages are supported:
   - `echo` - the message replayed to sender only
-  - `broadcast` - the message is sent to all active connection and the result of broadcasting is sent to sender. 
+  - `broadcast` - the message is sent to all active connection and the result of broadcasting is sent to sender (with message type `broadcastResult`).
+
+A message with unknown type as well as massage with incorrect JSON will return the error.
 
 ## build
 
