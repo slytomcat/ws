@@ -27,8 +27,8 @@ func newMockServer(interval time.Duration) *mockServer {
 	s := server.NewServer(u.Host)
 	m := &mockServer{
 		Close: func() error {
-			cancel()
 			s.Shutdown(ctx)
+			cancel()
 			s.Close()
 			return nil
 		},

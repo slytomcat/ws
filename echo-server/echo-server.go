@@ -23,29 +23,16 @@ type msg struct {
 	ListenerCount *int   `json:"listenerCount,omitempty"`
 }
 
-func sendMsg(m msg, c *websocket.Conn) {
-	response, _ := json.Marshal(m)
-	c.WriteMessage(websocket.TextMessage, response)
+type echoServer struct {
+	*server.Server
 }
 
-func main() {
-	DoMain(os.Args)
-}
-
-var srv *server.Server
-
-// DoMain is main with os.Args as parameter
-func DoMain(args []string) {
-	raw := defaultUrl
-	if len(args) > 1 {
-		raw = args[1]
-	}
-	u, err := url.Parse(raw)
+func New(addr string) (*echoServer, error) {
+	u, err := url.Parse(addr)
 	if err != nil {
-		fmt.Printf("url parsing error: %v", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("url parsing error: %v", err)
 	}
-	srv = server.NewServer(u.Host)
+	srv := server.NewServer(u.Host)
 	if !strings.HasPrefix(u.Path, "/") {
 		u.Path = "/" + u.Path
 	}
@@ -83,16 +70,41 @@ func DoMain(args []string) {
 			}
 		}
 	})
+	return &echoServer{srv}, nil
+}
+
+func sendMsg(m msg, c *websocket.Conn) {
+	response, _ := json.Marshal(m)
+	c.WriteMessage(websocket.TextMessage, response)
+}
+
+func main() {
+	if err := DoMain(os.Args); err != nil {
+		fmt.Printf("%v\n", err)
+		os.Exit(1)
+	}
+}
+
+// DoMain is main with os.Args as parameter
+func DoMain(args []string) error {
+	addr := defaultUrl
+	if len(args) > 1 {
+		addr = args[1]
+	}
+	srv, err := New(addr)
+	if err != nil {
+		return err
+	}
 	go func() {
 		sig := make(chan os.Signal, 2)
 		signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 		fmt.Printf("\n%s signal received, exiting...\n", <-sig)
 		srv.Close()
 	}()
-	fmt.Printf("starting echo server on %s...\n", u.Host)
+	fmt.Printf("starting echo server on %s...\n", addr)
 	err = srv.ListenAndServe()
 	if !errors.Is(err, http.ErrServerClosed) {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
+	return nil
 }

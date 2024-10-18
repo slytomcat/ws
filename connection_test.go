@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func success() error { return nil }
+
 func TestGetPrefix(t *testing.T) {
 	options.timestamp = true
 	defer func() { options.timestamp = false }()
@@ -31,7 +33,9 @@ func TestSession(t *testing.T) {
 	conn := newMockConn()
 	defer TryCloseNormally(conn, "test finished")
 	outR, outW, _ := os.Pipe()
-	rl, err := readline.NewEx(&readline.Config{Prompt: "> ", Stdout: outW})
+	// substitute FuncMakeRaw and FuncExitRaw to empty func to use open pipe as Stdin
+	// switching to raw file descriptor 0 will cause immediately closure of rl due to EOF
+	rl, err := readline.NewEx(&readline.Config{Prompt: "> ", Stdout: outW, FuncMakeRaw: success, FuncExitRaw: success})
 	require.NoError(t, err)
 	s := Session{
 		ws:      conn,
@@ -42,7 +46,7 @@ func TestSession(t *testing.T) {
 	}
 	sent := "test message"
 	typed := "typed"
-	binary := "binary"
+	binary := "binary as text"
 	unknown := "unknown"
 	toBeFiltered := "must be filtered"
 	// test sendMsg
@@ -60,6 +64,7 @@ func TestSession(t *testing.T) {
 	}()
 	require.Eventually(t, func() bool { return len(srv.Received) > 0 }, 20*time.Millisecond, 2*time.Millisecond)
 	require.Equal(t, typed, <-srv.Received)
+	require.NoError(t, rl.Close())
 	// test readWebsocket
 	go func() {
 		s.readWebsocket()
@@ -89,8 +94,8 @@ func TestSession(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 	outW.Close()
 	output, err := io.ReadAll(outR)
-	out := string(output)
 	require.NoError(t, err)
+	out := string(output)
 	require.Contains(t, out, " > "+sent)
 	require.Contains(t, out, " > "+typed)
 	require.Contains(t, out, " < "+sent)
@@ -98,7 +103,7 @@ func TestSession(t *testing.T) {
 	require.Contains(t, out, " < "+binary)
 	require.NotContains(t, out, toBeFiltered)
 	require.NotContains(t, out, unknown)
-	// t.Log(out)
+	t.Log(out)
 }
 
 func TestPingPong(t *testing.T) {
@@ -117,14 +122,13 @@ func TestPingPong(t *testing.T) {
 	errs := make(chan []error, 1)
 	// substitute FuncMakeRaw and FuncExitRaw to empty func to use open pipe as Stdin
 	// switching to raw file descriptor 0 will cause immediately closure of rl due to EOF
-	success := func() error { return nil }
 	rl, err := readline.NewEx(&readline.Config{Prompt: "> ", Stdin: inR, Stdout: outW, FuncMakeRaw: success, FuncExitRaw: success})
 	require.NoError(t, err)
 	s := &Session{rl: rl}
 	go func() {
 		errs <- s.connect(mockURL)
 	}()
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond) // let it work for a while
 	require.Eventually(t, func() bool { return s.cancel != nil }, 100*time.Millisecond, 2*time.Millisecond)
 	s.cancel()
 	inW.Close()
@@ -151,9 +155,12 @@ func TestInitMsg(t *testing.T) {
 	rl, err := readline.New(" >")
 	require.NoError(t, err)
 	s := &Session{rl: rl}
-	time.AfterFunc(500*time.Millisecond, func() { s.cancel() })
-	errs := s.connect(mockURL)
-	require.Empty(t, errs)
+	errs := make(chan []error)
+	go func() {
+		errs <- s.connect(mockURL)
+	}()
 	require.Eventually(t, func() bool { return len(m.Received) > 0 }, 20*time.Millisecond, 2*time.Millisecond)
 	require.Equal(t, message, <-m.Received)
+	s.cancel()
+	require.Empty(t, <-errs)
 }

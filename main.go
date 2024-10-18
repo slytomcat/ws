@@ -69,10 +69,14 @@ func root(cmd *cobra.Command, args []string) {
 	}
 	if options.origin == "" {
 		originURL := *dest
-		if dest.Scheme == "wss" {
+		switch dest.Scheme {
+		case "wss":
 			originURL.Scheme = "https"
-		} else {
+		case "ws":
 			originURL.Scheme = "http"
+		default:
+			fmt.Printf("unsupported scheme: %s\n", dest.Scheme)
+			os.Exit(1)
 		}
 		options.origin = originURL.String()
 	}

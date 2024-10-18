@@ -16,32 +16,12 @@ import (
 )
 
 func TestEchoServer(t *testing.T) {
-	envName := fmt.Sprintf("BE_%s", t.Name())
-	if os.Getenv(envName) == "1" {
-		// conn, _, err := dialer.Dial(defaultUrl, nil)
-		// if err == nil {
-		// 	fmt.Println("unexpected connection")
-		// 	os.Exit(2)
-		// }
-		go DoMain([]string{"", defaultUrl})
-		time.Sleep(500 * time.Millisecond)
-		// server.TryCloseNormally(conn, "tests finish")
-		//require.NoError(t, srv.Close())
-		syscall.Kill(syscall.Getpid(), syscall.SIGINT)
-		return
-	}
-	// collect child coverage artifacts in the parent files
-	args := []string{"-test.run=" + t.Name()}
-	for _, v := range os.Args {
-		if strings.Contains(v, "cover") {
-			args = append(args, v)
-		}
-	}
-	cmd := exec.Command(os.Args[0], args...)
-	r, err := cmd.StdoutPipe()
+	srv, err := New(defaultUrl)
+	errCh := make(chan error)
+	go func() {
+		errCh <- srv.ListenAndServe()
+	}()
 	require.NoError(t, err)
-	cmd.Env = append(os.Environ(), envName+"=1")
-	require.NoError(t, cmd.Start())
 	dialer := websocket.Dialer{}
 	var conn *websocket.Conn
 	require.Eventually(t, func() bool {
@@ -95,18 +75,60 @@ func TestEchoServer(t *testing.T) {
 			}
 		})
 	}
-
-	out, _ := io.ReadAll(r)
-	output := string(out)
-	err = cmd.Wait()
+	err = srv.Close()
 	require.NoError(t, err)
-	require.Contains(t, output, "starting echo server on localhost:8080...")
+	require.EqualError(t, <-errCh, "http: Server closed")
 }
 
-func TestDoMain(t *testing.T) {
+func TestEchoServerConErr(t *testing.T) {
+	srv, err := New(defaultUrl)
+	errCh := make(chan error)
+	go func() {
+		errCh <- srv.ListenAndServe()
+	}()
+	require.NoError(t, err)
+	dialer := websocket.Dialer{}
+	var conn *websocket.Conn
+	require.Eventually(t, func() bool {
+		conn, _, err = dialer.Dial(defaultUrl, nil)
+		return err == nil
+	}, 50*time.Millisecond, 5*time.Millisecond)
+	require.NoError(t, conn.Close())
+	require.NoError(t, srv.Close())
+}
+
+func TestMainDown(t *testing.T) {
 	envName := fmt.Sprintf("BE_%s", t.Name())
 	if os.Getenv(envName) == "1" {
-		DoMain([]string{"", ":"})
+		os.Args = []string([]string{""})
+		go main()
+		time.Sleep(50 * time.Millisecond)
+		syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+		return
+	}
+	args := []string{"-test.run=" + t.Name()}
+	for _, v := range os.Args {
+		if strings.Contains(v, "cover") {
+			args = append(args, v)
+		}
+	}
+	cmd := exec.Command(os.Args[0], args...)
+	r, err := cmd.StdoutPipe()
+	require.NoError(t, err)
+	cmd.Env = append(os.Environ(), envName+"=1")
+	require.NoError(t, cmd.Start())
+	out, _ := io.ReadAll(r)
+	err = cmd.Wait()
+	require.NoError(t, err)
+	require.Contains(t, string(out), "starting echo server on ws://localhost:8080/ws...\n")
+}
+
+func TestMainError(t *testing.T) {
+	envName := fmt.Sprintf("BE_%s", t.Name())
+	if os.Getenv(envName) == "1" {
+		os.Args = []string([]string{"", ":"})
+		main()
+
 		return
 	}
 	args := []string{"-test.run=" + t.Name()}
@@ -123,38 +145,5 @@ func TestDoMain(t *testing.T) {
 	out, _ := io.ReadAll(r)
 	err = cmd.Wait()
 	require.EqualError(t, err, "exit status 1")
-	require.Equal(t, "url parsing error: parse \":\": missing protocol scheme", string(out))
-}
-
-func TestEchoServer2(t *testing.T) {
-	url := "ws://localhost:8080"
-	envName := fmt.Sprintf("BE_%s", t.Name())
-	if os.Getenv(envName) == "1" {
-		go DoMain([]string{"", url})
-		time.Sleep(50 * time.Millisecond)
-		dialer := websocket.Dialer{}
-		conn, _, err := dialer.Dial(url, nil)
-		require.NoError(t, err)
-		conn.Close()
-		time.Sleep(5 * time.Millisecond)
-		syscall.Kill(syscall.Getpid(), syscall.SIGINT)
-		return
-	}
-	// collect child coverage artifacts in the parent files
-	args := []string{"-test.run=" + t.Name()}
-	for _, v := range os.Args {
-		if strings.Contains(v, "cover") {
-			args = append(args, v)
-		}
-	}
-	cmd := exec.Command(os.Args[0], args...)
-	r, err := cmd.StdoutPipe()
-	require.NoError(t, err)
-	cmd.Env = append(os.Environ(), envName+"=1")
-	require.NoError(t, cmd.Start())
-	out, _ := io.ReadAll(r)
-	output := string(out)
-	err = cmd.Wait()
-	require.NoError(t, err)
-	require.Contains(t, output, "starting echo server on localhost:8080...")
+	require.Equal(t, "url parsing error: parse \":\": missing protocol scheme\n", string(out))
 }
